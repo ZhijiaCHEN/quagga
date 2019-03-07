@@ -9806,7 +9806,7 @@ void bgp_vty_init(void)
 
     /* "bgp config-type" commands. */
     /* Bolero  commands starts. */
-    install_element(CONFIG_NODE, &bolero_cmd);
+    install_element(BGP_NODE, &bolero_cmd);
 
     install_element(CONFIG_NODE, &bgp_config_type_cmd);
     install_element(CONFIG_NODE, &no_bgp_config_type_cmd);
