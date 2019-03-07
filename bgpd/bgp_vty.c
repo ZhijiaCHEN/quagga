@@ -301,6 +301,7 @@ DEFUN(bolero,
       NO_STR
       "Enable bolero\n")
 {
+    vty_out(vty, "Bolero enabled!");
     zlog_debug("Bolero enabled!");
     return CMD_SUCCESS;
 }
