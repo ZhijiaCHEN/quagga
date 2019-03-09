@@ -31,12 +31,16 @@ typedef u_int32_t as_t;
 typedef u_int16_t as16_t; /* we may still encounter 16 Bit asnums */
 typedef u_int16_t bgp_size_t;
 
+/* BOLERO ADDED*/
+#define BOLERO_DEFAULT_ADDRESS "localhost"
+#define BOLERO_DEFAULT_PORT 5432
+#define BOLERO_DEFAULT_USER "ravel"
+#define BOLERO_DEFAULT_PASSWORD "ravel"
+#define BOLERO_DEFAULT_DATABASE "ravel"
+
 /* BGP master for system wide configurations and variables.  */
 struct bgp_master
 {
-    PGconn *conn;
-    PGresult *res;
-
     /* BGP instance list.  */
     struct list *bgp;
 
@@ -70,7 +74,10 @@ struct bgp_master
 /* BGP instance structure.  */
 struct bgp
 {
-    /* Bolero address and credentials */
+    /* BOLERO ADDED */
+    /* Bolero connection parameters */
+    PGconn *boleroConn;
+    PGresult *boleroRes;
     char *boleroAddress;
     u_int16_t boleroPort;
     char *boleroUser;

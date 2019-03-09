@@ -294,15 +294,90 @@ bgp_vty_return(struct vty *vty, int ret)
 
 /* BGP global configuration.  */
 
-/* Bolero configuration starts here. */
+/* BOLERO ADDED */
+/* create postgres connection */
 DEFUN(bolero,
       bolero_cmd,
       "bolero",
       NO_STR
       "Enable bolero\n")
 {
-    vty_out(vty, "Bolero enabled!");
-    zlog_debug("Bolero enabled!");
+    struct bgp *bgp = vty->index;
+    char *conninfo = (char *)malloc(1024 * sizeof(char));
+    if (!bgp->boleroAddress)
+        bgp->boleroAddress = strdup(BOLERO_DEFAULT_ADDRESS);
+    if (bgp->boleroPort == 0)
+        bgp->boleroPort = BOLERO_DEFAULT_PORT;
+    if (!bgp->boleroUser)
+        bgp->boleroUser = strdup(BOLERO_DEFAULT_USER);
+    if (!bgp->boleroPassword)
+        bgp->boleroPassword = strdup(BOLERO_DEFAULT_PASSWORD);
+    if (!bgp->boleroDatabase)
+        bgp->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
+    if (bgp->boleroConn)
+        PQfinish(bgp->boleroConn);
+    if (sprintf("hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
+    {
+        vty_out(vty, "Bolero connection string is over 1024 characters.");
+        return CMD_ERR_NOTHING_TODO;
+    }
+    bgp->boleroConn = PQconnectdb(conninfo);
+    if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
+    {
+        vty_out(vty, "Connection to database failed: %s",
+                PQerrorMessage(bgp->boleroConn));
+        PQfinish(bgp->boleroConn);
+        return CMD_ERR_NOTHING_TODO;
+    }
+    vty_out(vty, "Bolero connected!");
+    return CMD_SUCCESS;
+}
+
+/* BOLERO ADDED */
+/* set postgres connection parameters*/
+DEFUN(bolero_params,
+      bolero__params_cmd,
+      "bolero (address|port|user|password|database) (.)",
+      "Bolero connection parameters\n")
+{
+    struct bgp *bgp = vty->index;
+    if (argc == 1)
+    {
+        return CMD_ERR_INCOMPLETE;
+    }
+    if (strcmp(argv[0], "address") == 0)
+    {
+        if (bgp->boleroAddress)
+            free(bgp->boleroAddress);
+        bgp->boleroAddress = strdup(argv[0]);
+    }
+    if (strcmp(argv[0], "port") == 0)
+    {
+        VTY_GET_INTEGER_RANGE("Bolero port number", bgp->boleroPort, argv[0], 1, __UINT16_MAX__);
+        if (bgp->boleroPort == 0)
+        {
+            vty_out(vty, "Invalid value %s for Bolero port number.", argv[0]);
+            return CMD_ERR_NO_MATCH;
+        }
+    }
+    if (strcmp(argv[0], "user") == 0)
+    {
+        if (bgp->boleroUser)
+            free(bgp->boleroUser);
+        bgp->boleroUser = strdup(argv[0]);
+    }
+    if (strcmp(argv[0], "password") == 0)
+    {
+        if (bgp->boleroPassword)
+            free(bgp->boleroPassword);
+        bgp->boleroPassword = strdup(argv[0]);
+    }
+    if (strcmp(argv[0], "database") == 0)
+    {
+        if (bgp->boleroDatabase)
+            free(bgp->boleroDatabase);
+        bgp->boleroDatabase = strdup(argv[0]);
+    }
     return CMD_SUCCESS;
 }
 
