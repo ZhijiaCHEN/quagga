@@ -24,8 +24,8 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 /* For union sockunion.  */
 #include "sockunion.h"
 
-//#include <postgresql/libpq-fe.h>
-#include "libpq-fe.h"
+#include <postgresql/libpq-fe.h>
+//#include "libpq-fe.h"
 /* Typedef BGP specific types.  */
 typedef u_int32_t as_t;
 typedef u_int16_t as16_t; /* we may still encounter 16 Bit asnums */

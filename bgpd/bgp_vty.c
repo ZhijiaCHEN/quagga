@@ -316,28 +316,36 @@ DEFUN(bolero,
         bgp->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
     if (bgp->boleroConn)
         PQfinish(bgp->boleroConn);
-    if (sprintf("hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
+    if (sprintf(conninfo, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
     {
         vty_out(vty, "Bolero connection string is over 1024 characters.");
         return CMD_ERR_NOTHING_TODO;
     }
+
     bgp->boleroConn = PQconnectdb(conninfo);
     if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
     {
-        vty_out(vty, "Connection to database failed: %s",
+        vty_out(vty, "Connection to database failed: %s\n",
                 PQerrorMessage(bgp->boleroConn));
         PQfinish(bgp->boleroConn);
         return CMD_ERR_NOTHING_TODO;
     }
-    vty_out(vty, "Bolero connected!");
+    vty_out(vty, "Bolero connected!\n");
+    bgp->boleroRes = PQexec(bgp->boleroConn, "INSERT INTO cf VALUES(1,2,3,4)");
+    if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
+    {
+        vty_out(vty, "%s\n", PQerrorMessage(bgp->boleroConn));
+    }
+    PQclear(bgp->boleroRes);
+    PQfinish(bgp->boleroConn);
     return CMD_SUCCESS;
 }
 
 /* BOLERO ADDED */
 /* set postgres connection parameters*/
 DEFUN(bolero_params,
-      bolero__params_cmd,
-      "bolero (address|port|user|password|database) (.)",
+      bolero_params_cmd,
+      "bolero (address|port|user|password|database) .",
       "Bolero connection parameters\n")
 {
     struct bgp *bgp = vty->index;
@@ -349,34 +357,39 @@ DEFUN(bolero_params,
     {
         if (bgp->boleroAddress)
             free(bgp->boleroAddress);
-        bgp->boleroAddress = strdup(argv[0]);
+        bgp->boleroAddress = strdup(argv[1]);
     }
-    if (strcmp(argv[0], "port") == 0)
+    else if (strcmp(argv[0], "port") == 0)
     {
-        VTY_GET_INTEGER_RANGE("Bolero port number", bgp->boleroPort, argv[0], 1, __UINT16_MAX__);
+        VTY_GET_INTEGER_RANGE("Bolero port number", bgp->boleroPort, argv[1], 1, __UINT16_MAX__);
         if (bgp->boleroPort == 0)
         {
-            vty_out(vty, "Invalid value %s for Bolero port number.", argv[0]);
+            vty_out(vty, "Invalid value %s for Bolero port number.\n", argv[1]);
             return CMD_ERR_NO_MATCH;
         }
     }
-    if (strcmp(argv[0], "user") == 0)
+    else if (strcmp(argv[0], "user") == 0)
     {
         if (bgp->boleroUser)
             free(bgp->boleroUser);
-        bgp->boleroUser = strdup(argv[0]);
+        bgp->boleroUser = strdup(argv[1]);
     }
-    if (strcmp(argv[0], "password") == 0)
+    else if (strcmp(argv[0], "password") == 0)
     {
         if (bgp->boleroPassword)
             free(bgp->boleroPassword);
-        bgp->boleroPassword = strdup(argv[0]);
+        bgp->boleroPassword = strdup(argv[1]);
     }
-    if (strcmp(argv[0], "database") == 0)
+    else if (strcmp(argv[0], "database") == 0)
     {
         if (bgp->boleroDatabase)
             free(bgp->boleroDatabase);
-        bgp->boleroDatabase = strdup(argv[0]);
+        bgp->boleroDatabase = strdup(argv[1]);
+    }
+    else
+    {
+        vty_out(vty, "Unrecognized Bolero connection parameter %s.\n", argv[0]);
+        return CMD_ERR_NO_MATCH;
     }
     return CMD_SUCCESS;
 }
@@ -9880,8 +9893,11 @@ void bgp_vty_init(void)
     install_element(CONFIG_NODE, &no_bgp_multiple_instance_cmd);
 
     /* "bgp config-type" commands. */
-    /* Bolero  commands starts. */
-    install_element(BGP_NODE, &bolero_cmd);
+
+    /* BOLERO ADDED */
+    /* install Bolero commands*/
+    install_element(CONFIG_NODE, &bolero_cmd);
+    install_element(CONFIG_NODE, &bolero_params_cmd);
 
     install_element(CONFIG_NODE, &bgp_config_type_cmd);
     install_element(CONFIG_NODE, &no_bgp_config_type_cmd);

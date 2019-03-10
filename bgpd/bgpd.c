@@ -2053,16 +2053,6 @@ bgp_create(as_t *as, const char *name)
     THREAD_TIMER_ON(bm->master, bgp->t_startup, bgp_startup_timer_expire,
                     bgp, bgp->restart_time);
 
-    /* BOLERO ADDED*/
-    /* init bolero parameters*/
-    bgp->boleroAddress = NULL;
-    bgp->boleroPort = 0;
-    bgp->boleroUser = NULL;
-    bgp->boleroPassword = NULL;
-    bgp->boleroDatabase = NULL;
-    bgp->boleroConn = NULL;
-    bgp->boleroRes = NULL;
-
     return bgp;
 }
 
@@ -2244,6 +2234,10 @@ int bgp_delete(struct bgp *bgp)
     listnode_delete(bm->bgp, bgp);
     if (list_isempty(bm->bgp))
         bgp_close();
+
+    /* BOLERO ADDED */
+    /* close Bolero connection */
+    PQfinish(bgp->boleroConn);
 
     bgp_unlock(bgp); /* initial reference */
 
