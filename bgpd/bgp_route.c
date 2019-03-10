@@ -2061,6 +2061,9 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
     char buf[SU_ADDRSTRLEN];
     int connected = 0;
 
+    /* BOLERO ADDED */
+    char *sqlBuf;
+
     memset(&new_attr, 0, sizeof(struct attr));
     memset(&new_extra, 0, sizeof(struct attr_extra));
 
@@ -2069,6 +2072,37 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
 
     /* BOLERO ADDED */
     /* send every route to bolero */
+    /* check connection */
+    if (PQstatus(bpg->boleroConn) != CONNECTION_OK)
+    {
+        zlog(peer->log, LOG_WARNING, "Bolero connection is broken: %s\n", PQerrorMessage(bgp->boleroConn));
+        PQfinish(bgp->boleroConn);
+        zlog(peer->log, LOG_INFO, "Reconnect to Bolero\n");
+        bgp->boleroConn = PQconnectdb(bgp->boleroConnInfo);
+        if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
+        {
+            zlog(peer->log, LOG_WARNING, "Reconnection to Bolero failed: %s\nGive up reporting route.\n", PQerrorMessage(bgp->boleroConn));
+            PQfinish(bgp->boleroConn);
+        }
+    }
+    if (PQstatus(bpg->boleroConn) == CONNECTION_OK)
+    {
+        sqlBuf = malloc(1024);
+        /* fixme: use prepare statement */
+        snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop), attr->aspath->str);
+        bgp->boleroRes = PQexec(bgp->boleroConn);
+        zlog(peer->log, LOG_DEBUG, "insertion string %s\n", sqlBuf);
+        if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
+        {
+            zlog(peer->log, LOG_WARNING, "Failed to report new route for prefix %s/%d to Bolero: %s\n", PQerrorMessage(bgp->boleroConn), inet_ntop(p->family, &p->u.prefix, buf, SU_ADDRSTRLEN), p->prefixlen);
+        }
+        else
+        {
+            zlog(peer->log, LOG_DEBUG, "Report new route for prefix %s/%d to Bolero\n" inet_ntop(p->family, &p->u.prefix, buf, SU_ADDRSTRLEN), p->prefixlen);
+        }
+
+        PQclear(bgp->boleroRes);
+    }
 
     /* When peer's soft reconfiguration enabled.  Record input packet in
      Adj-RIBs-In.  */

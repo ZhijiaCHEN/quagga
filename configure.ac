@@ -409,7 +409,8 @@ if test "$enable_protobuf" = "yes"; then
    fi
 fi
 
-#
+
+# BOLERO ADDED
 # Logic for libpq support.
 #
 AC_CHECK_LIB(pq, main, LIBS="$LIBS -lpq", AC_MSG_ERROR([libpq is not found.]))
@@ -1635,11 +1636,6 @@ AC_DEFINE_UNQUOTED(ISIS_VTYSH_PATH, "$quagga_statedir/isisd.vty",isisd vty socke
 AC_DEFINE_UNQUOTED(PIM_VTYSH_PATH, "$quagga_statedir/pimd.vty",pimd vty socket)
 AC_DEFINE_UNQUOTED(DAEMON_VTY_DIR, "$quagga_statedir",daemon vty directory)
 
-# a patch for Bolero
-#AC_SUBST([PGCFLAG],[$(pkg-config --cflags libpq)])
-#CFLAGS="$CFLAGS $PGCFLAG"
-#AC_SUBST([PGLIB],[$(pkg-config --libs libpq)])
-#LIBS="$LIBS $PGLIB"
 
 dnl -------------------------------
 dnl Quagga sources should always be 

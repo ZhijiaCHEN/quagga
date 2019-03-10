@@ -83,6 +83,7 @@ struct bgp
     char *boleroUser;
     char *boleroPassword;
     char *boleroDatabase;
+    char boleroConnInfo[1024];
 
     /* AS number of this BGP instance.  */
     as_t as;

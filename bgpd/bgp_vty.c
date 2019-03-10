@@ -303,7 +303,7 @@ DEFUN(bolero,
       "Enable bolero\n")
 {
     struct bgp *bgp = vty->index;
-    char *conninfo = (char *)malloc(1024 * sizeof(char));
+    ;
     if (!bgp->boleroAddress)
         bgp->boleroAddress = strdup(BOLERO_DEFAULT_ADDRESS);
     if (bgp->boleroPort == 0)
@@ -316,16 +316,16 @@ DEFUN(bolero,
         bgp->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
     if (bgp->boleroConn)
         PQfinish(bgp->boleroConn);
-    if (sprintf(conninfo, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
+    if (snprintf(bgp->boleroConnInfo, 1024, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
     {
         vty_out(vty, "Bolero connection string is over 1024 characters.");
         return CMD_ERR_NOTHING_TODO;
     }
 
-    bgp->boleroConn = PQconnectdb(conninfo);
+    bgp->boleroConn = PQconnectdb(bgp->boleroConnInfo);
     if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
     {
-        vty_out(vty, "Connection to database failed: %s\n",
+        vty_out(vty, "Connection to Bolero failed: %s\n",
                 PQerrorMessage(bgp->boleroConn));
         PQfinish(bgp->boleroConn);
         return CMD_ERR_NOTHING_TODO;
