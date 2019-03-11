@@ -2237,7 +2237,7 @@ int bgp_delete(struct bgp *bgp)
 
     /* BOLERO ADDED */
     /* close Bolero connection */
-    PQfinish(bgp->boleroConn);
+    //PQfinish(bgp->boleroConn);
 
     bgp_unlock(bgp); /* initial reference */
 

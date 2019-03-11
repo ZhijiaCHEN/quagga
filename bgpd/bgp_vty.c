@@ -303,7 +303,6 @@ DEFUN(bolero,
       "Enable bolero\n")
 {
     struct bgp *bgp = vty->index;
-    ;
     if (!bgp->boleroAddress)
         bgp->boleroAddress = strdup(BOLERO_DEFAULT_ADDRESS);
     if (bgp->boleroPort == 0)
@@ -314,13 +313,16 @@ DEFUN(bolero,
         bgp->boleroPassword = strdup(BOLERO_DEFAULT_PASSWORD);
     if (!bgp->boleroDatabase)
         bgp->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
-    if (bgp->boleroConn)
-        PQfinish(bgp->boleroConn);
+    //if (bgp->boleroConn)
+    //    PQfinish(bgp->boleroConn);
+    bgp->boleroConnInfo = malloc(1024);
     if (snprintf(bgp->boleroConnInfo, 1024, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
     {
         vty_out(vty, "Bolero connection string is over 1024 characters.");
         return CMD_ERR_NOTHING_TODO;
     }
+
+    vty_out(vty, "Bolero connection string %s\n", bgp->boleroConnInfo);
 
     bgp->boleroConn = PQconnectdb(bgp->boleroConnInfo);
     if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
@@ -331,13 +333,6 @@ DEFUN(bolero,
         return CMD_ERR_NOTHING_TODO;
     }
     vty_out(vty, "Bolero connected!\n");
-    bgp->boleroRes = PQexec(bgp->boleroConn, "INSERT INTO cf VALUES(1,2,3,4)");
-    if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
-    {
-        vty_out(vty, "%s\n", PQerrorMessage(bgp->boleroConn));
-    }
-    PQclear(bgp->boleroRes);
-    PQfinish(bgp->boleroConn);
     return CMD_SUCCESS;
 }
 
@@ -355,8 +350,6 @@ DEFUN(bolero_params,
     }
     if (strcmp(argv[0], "address") == 0)
     {
-        if (bgp->boleroAddress)
-            free(bgp->boleroAddress);
         bgp->boleroAddress = strdup(argv[1]);
     }
     else if (strcmp(argv[0], "port") == 0)
@@ -370,20 +363,14 @@ DEFUN(bolero_params,
     }
     else if (strcmp(argv[0], "user") == 0)
     {
-        if (bgp->boleroUser)
-            free(bgp->boleroUser);
         bgp->boleroUser = strdup(argv[1]);
     }
     else if (strcmp(argv[0], "password") == 0)
     {
-        if (bgp->boleroPassword)
-            free(bgp->boleroPassword);
         bgp->boleroPassword = strdup(argv[1]);
     }
     else if (strcmp(argv[0], "database") == 0)
     {
-        if (bgp->boleroDatabase)
-            free(bgp->boleroDatabase);
         bgp->boleroDatabase = strdup(argv[1]);
     }
     else
