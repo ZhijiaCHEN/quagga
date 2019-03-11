@@ -2235,11 +2235,14 @@ int bgp_delete(struct bgp *bgp)
     if (list_isempty(bm->bgp))
         bgp_close();
 
-    /* BOLERO ADDED */
-    /* close Bolero connection */
-    //PQfinish(bgp->boleroConn);
-
     bgp_unlock(bgp); /* initial reference */
+
+    /* BOLERO ADDED */
+    if (bgp->boleroConn)
+    {
+        PQfinish(bgp->boleroConn);
+        zlog_debug("Bolero connection closed.\n");
+    }
 
     return 0;
 }

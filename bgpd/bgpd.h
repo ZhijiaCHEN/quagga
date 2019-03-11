@@ -34,13 +34,22 @@ typedef u_int16_t bgp_size_t;
 /* BOLERO ADDED*/
 #define BOLERO_DEFAULT_ADDRESS "localhost"
 #define BOLERO_DEFAULT_PORT 5432
-#define BOLERO_DEFAULT_USER "ravel"
-#define BOLERO_DEFAULT_PASSWORD "ravel"
-#define BOLERO_DEFAULT_DATABASE "ravel"
+#define BOLERO_DEFAULT_USER "bolero"
+#define BOLERO_DEFAULT_PASSWORD "bolero"
+#define BOLERO_DEFAULT_DATABASE "bolero"
 
 /* BGP master for system wide configurations and variables.  */
 struct bgp_master
 {
+    /* BOLERO ADDED */
+    /* Bolero connection parameters */
+    char *boleroAddress;
+    u_int16_t boleroPort;
+    char *boleroUser;
+    char *boleroPassword;
+    char *boleroDatabase;
+    char *boleroConnInfo;
+
     /* BGP instance list.  */
     struct list *bgp;
 
@@ -75,15 +84,9 @@ struct bgp_master
 struct bgp
 {
     /* BOLERO ADDED */
-    /* Bolero connection parameters */
+    /* Bolero connection */
     PGconn *boleroConn;
     PGresult *boleroRes;
-    char *boleroAddress;
-    u_int16_t boleroPort;
-    char *boleroUser;
-    char *boleroPassword;
-    char *boleroDatabase;
-    char *boleroConnInfo;
 
     /* AS number of this BGP instance.  */
     as_t as;

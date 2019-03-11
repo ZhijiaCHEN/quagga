@@ -2073,36 +2073,43 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
     /* BOLERO ADDED */
     /* send every route to bolero */
     /* check connection */
-    if (PQstatus(bpg->boleroConn) != CONNECTION_OK)
+    zlog(peer->log, LOG_WARNING, "bolero address=%s, port=%d, user=%s", bm->boleroAddress, bm->boleroPort, bm->boleroUser);
+    if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
     {
         zlog(peer->log, LOG_WARNING, "Bolero connection is broken: %s\n", PQerrorMessage(bgp->boleroConn));
         PQfinish(bgp->boleroConn);
         zlog(peer->log, LOG_INFO, "Reconnect to Bolero\n");
-        bgp->boleroConn = PQconnectdb(bgp->boleroConnInfo);
+        bgp->boleroConn = PQconnectdb(bm->boleroConnInfo);
         if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
         {
-            zlog(peer->log, LOG_WARNING, "Reconnection to Bolero failed: %s\nGive up reporting route.\n", PQerrorMessage(bgp->boleroConn));
-            PQfinish(bgp->boleroConn);
+            zlog_err("Reconnection to Bolero failed: %s\n", PQerrorMessage(bgp->boleroConn));
         }
     }
-    if (PQstatus(bpg->boleroConn) == CONNECTION_OK)
+    if (PQstatus(bgp->boleroConn) == CONNECTION_OK)
     {
         sqlBuf = malloc(1024);
-        /* fixme: use prepare statement */
-        snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop), attr->aspath->str);
-        bgp->boleroRes = PQexec(bgp->boleroConn);
+        // fixme: use prepare statement
+        //snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop.s_addr), attr->aspath->str);
+        snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES('%s/%d', %d, %d, '%s', '%s')", inet_ntoa(p->u.prefix4), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str);
+        bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
         zlog(peer->log, LOG_DEBUG, "insertion string %s\n", sqlBuf);
+        printf("insertion string %s\n", sqlBuf);
         if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
         {
-            zlog(peer->log, LOG_WARNING, "Failed to report new route for prefix %s/%d to Bolero: %s\n", PQerrorMessage(bgp->boleroConn), inet_ntop(p->family, &p->u.prefix, buf, SU_ADDRSTRLEN), p->prefixlen);
+            zlog(peer->log, LOG_WARNING, "Failed to report new route for prefix %s/%d to Bolero: %s\n", inet_ntoa(p->u.prefix4), p->prefixlen, PQerrorMessage(bgp->boleroConn));
         }
         else
         {
-            zlog(peer->log, LOG_DEBUG, "Report new route for prefix %s/%d to Bolero\n" inet_ntop(p->family, &p->u.prefix, buf, SU_ADDRSTRLEN), p->prefixlen);
+            zlog(peer->log, LOG_DEBUG, "Report new route for prefix %s/%d to Bolero\n", inet_ntoa(p->u.prefix4), p->prefixlen);
         }
-
+        free(sqlBuf);
         PQclear(bgp->boleroRes);
     }
+
+    sqlBuf = malloc(1024);
+    snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop.s_addr), attr->aspath->str);
+    zlog(peer->log, LOG_DEBUG, "insertion string %s\n", sqlBuf);
+    free(sqlBuf);
 
     /* When peer's soft reconfiguration enabled.  Record input packet in
      Adj-RIBs-In.  */

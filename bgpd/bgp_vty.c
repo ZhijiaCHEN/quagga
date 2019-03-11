@@ -302,37 +302,25 @@ DEFUN(bolero,
       NO_STR
       "Enable bolero\n")
 {
-    struct bgp *bgp = vty->index;
-    if (!bgp->boleroAddress)
-        bgp->boleroAddress = strdup(BOLERO_DEFAULT_ADDRESS);
-    if (bgp->boleroPort == 0)
-        bgp->boleroPort = BOLERO_DEFAULT_PORT;
-    if (!bgp->boleroUser)
-        bgp->boleroUser = strdup(BOLERO_DEFAULT_USER);
-    if (!bgp->boleroPassword)
-        bgp->boleroPassword = strdup(BOLERO_DEFAULT_PASSWORD);
-    if (!bgp->boleroDatabase)
-        bgp->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
+    if (!bm->boleroAddress)
+        bm->boleroAddress = strdup(BOLERO_DEFAULT_ADDRESS);
+    if (bm->boleroPort == 0)
+        bm->boleroPort = BOLERO_DEFAULT_PORT;
+    if (!bm->boleroUser)
+        bm->boleroUser = strdup(BOLERO_DEFAULT_USER);
+    if (!bm->boleroPassword)
+        bm->boleroPassword = strdup(BOLERO_DEFAULT_PASSWORD);
+    if (!bm->boleroDatabase)
+        bm->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
     //if (bgp->boleroConn)
     //    PQfinish(bgp->boleroConn);
-    bgp->boleroConnInfo = malloc(1024);
-    if (snprintf(bgp->boleroConnInfo, 1024, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bgp->boleroAddress, bgp->boleroPort, bgp->boleroUser, bgp->boleroPassword, bgp->boleroDatabase) < 0)
+    bm->boleroConnInfo = malloc(1024);
+    if (snprintf(bm->boleroConnInfo, 1024, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bm->boleroAddress, bm->boleroPort, bm->boleroUser, bm->boleroPassword, bm->boleroDatabase) < 0)
     {
         vty_out(vty, "Bolero connection string is over 1024 characters.");
         return CMD_ERR_NOTHING_TODO;
     }
-
-    vty_out(vty, "Bolero connection string %s\n", bgp->boleroConnInfo);
-
-    bgp->boleroConn = PQconnectdb(bgp->boleroConnInfo);
-    if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
-    {
-        vty_out(vty, "Connection to Bolero failed: %s\n",
-                PQerrorMessage(bgp->boleroConn));
-        PQfinish(bgp->boleroConn);
-        return CMD_ERR_NOTHING_TODO;
-    }
-    vty_out(vty, "Bolero connected!\n");
+    vty_out(vty, "Bolero connection string %s\n", bm->boleroConnInfo);
     return CMD_SUCCESS;
 }
 
@@ -343,19 +331,18 @@ DEFUN(bolero_params,
       "bolero (address|port|user|password|database) .",
       "Bolero connection parameters\n")
 {
-    struct bgp *bgp = vty->index;
     if (argc == 1)
     {
         return CMD_ERR_INCOMPLETE;
     }
     if (strcmp(argv[0], "address") == 0)
     {
-        bgp->boleroAddress = strdup(argv[1]);
+        bm->boleroAddress = strdup(argv[1]);
     }
     else if (strcmp(argv[0], "port") == 0)
     {
-        VTY_GET_INTEGER_RANGE("Bolero port number", bgp->boleroPort, argv[1], 1, __UINT16_MAX__);
-        if (bgp->boleroPort == 0)
+        VTY_GET_INTEGER_RANGE("Bolero port number", bm->boleroPort, argv[1], 1, __UINT16_MAX__);
+        if (bm->boleroPort == 0)
         {
             vty_out(vty, "Invalid value %s for Bolero port number.\n", argv[1]);
             return CMD_ERR_NO_MATCH;
@@ -363,15 +350,15 @@ DEFUN(bolero_params,
     }
     else if (strcmp(argv[0], "user") == 0)
     {
-        bgp->boleroUser = strdup(argv[1]);
+        bm->boleroUser = strdup(argv[1]);
     }
     else if (strcmp(argv[0], "password") == 0)
     {
-        bgp->boleroPassword = strdup(argv[1]);
+        bm->boleroPassword = strdup(argv[1]);
     }
     else if (strcmp(argv[0], "database") == 0)
     {
-        bgp->boleroDatabase = strdup(argv[1]);
+        bm->boleroDatabase = strdup(argv[1]);
     }
     else
     {
