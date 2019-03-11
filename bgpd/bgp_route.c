@@ -2503,18 +2503,14 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
         sqlBuf = malloc(1024);
         snprintf(sqlBuf, 1024, "DELETE FROM rib WHERE rid = %ld", ri->attr->rid);
         bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
-        zlog(peer->log, LOG_WARNING, "delete query executed\n");
         if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
         {
-            zlog(peer->log, LOG_WARNING, "delete cmd no OK\n");
             zlog(peer->log, LOG_ERR, "Failed to withdraw route for prefix %s/%d from Bolero with rid %ld: %s\n", inet_ntoa(p->u.prefix4), p->prefixlen, ri->attr->rid, PQerrorMessage(bgp->boleroConn));
         }
         else
         {
-            zlog(peer->log, LOG_WARNING, "delete cmd OK\n");
-            zlog(peer->log, LOG_WARNING, "prefix %s/%d with rid %ld withrew from Bolero, 0 routes deleted.\n", inet_ntoa(p->u.prefix4), p->prefixlen, ri->attr->rid); //, PQcmdTuples(bgp->boleroRes));
+            zlog(peer->log, LOG_WARNING, "prefix %s/%d with rid %ld withrew from Bolero, %s row(s) deleted.\n", inet_ntoa(p->u.prefix4), p->prefixlen, ri->attr->rid, PQcmdTuples(bgp->boleroRes));
         }
-        zlog(peer->log, LOG_WARNING, "delete cmd finished\n");
         free(sqlBuf);
         PQclear(bgp->boleroRes);
     }
