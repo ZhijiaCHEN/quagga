@@ -2237,13 +2237,6 @@ int bgp_delete(struct bgp *bgp)
 
     bgp_unlock(bgp); /* initial reference */
 
-    /* BOLERO ADDED */
-    if (bgp->boleroConn)
-    {
-        PQfinish(bgp->boleroConn);
-        zlog_debug("Bolero connection closed.\n");
-    }
-
     return 0;
 }
 

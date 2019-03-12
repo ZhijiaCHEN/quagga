@@ -567,6 +567,9 @@ DEFUN(bgp_router_id,
 
     bgp_router_id_static_set(bgp, id);
 
+    /* BOLERO ADDED */
+    bm->routerID = strdup(argv[0]);
+
     return CMD_SUCCESS;
 }
 

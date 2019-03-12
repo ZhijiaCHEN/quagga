@@ -2063,6 +2063,7 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
 
     /* BOLERO ADDED */
     char *sqlBuf;
+    char addrBuf[BUFSIZ];
 
     memset(&new_attr, 0, sizeof(struct attr));
     memset(&new_extra, 0, sizeof(struct attr_extra));
@@ -2089,7 +2090,7 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
         sqlBuf = malloc(1024);
         // fixme: use prepare statement
         //snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop.s_addr), attr->aspath->str);
-        snprintf(sqlBuf, 1024, "INSERT INTO rib (prefix, local_preference, metric, next_hop, as_path, router) VALUES('%s/%d', %d, %d, '%s', '%s', '%s') RETURNING rid", inet_ntoa(p->u.prefix4), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, inet_ntoa(bgp->peer_self->local_id));
+        snprintf(sqlBuf, 1024, "INSERT INTO rib (prefix, local_preference, metric, next_hop, as_path, router) VALUES('%s/%d', %d, %d, '%s', '%s', '%s') RETURNING rid", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, bm->routerID);
         bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
         if (PQresultStatus(bgp->boleroRes) != PGRES_TUPLES_OK)
         {

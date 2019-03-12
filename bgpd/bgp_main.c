@@ -80,6 +80,7 @@ void sigusr1(void);
 
 /* BOLERO ADDED */
 void bolero_init(void);
+void bolero_delete(void);
 
 static void bgp_exit(int);
 
@@ -234,6 +235,9 @@ bgp_exit(int status)
     /* it only makes sense for this to be called on a clean exit */
     assert(status == 0);
 
+    /* BOLERO ADDED */
+    bolero_delete();
+
     /* reverse bgp_master_init */
     for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, bgp))
         bgp_delete(bgp);
@@ -334,7 +338,13 @@ bgp_exit(int status)
         log_memstats_stderr("bgpd");
 
     /* BOLERO ADDED */
+    free(bm->boleroAddress);
+    free(bm->boleroUser);
+    free(bm->boleroPassword);
+    free(bm->boleroDatabase);
     free(bm->boleroConnInfo);
+    free(bm->routerID);
+
     exit(status);
 }
 
@@ -350,6 +360,23 @@ void bolero_init(void)
         {
             zlog_err("Connection to Bolero failed: %s\n", PQerrorMessage(bgp->boleroConn));
             bgp_exit(1);
+        }
+        zlog_notice("Bolero connected!\n");
+    }
+}
+
+/* BOLERO ADDED */
+void bolero_delete(void)
+{
+    struct bgp *bgp;
+    struct listnode *node, *nnode;
+    for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, bgp))
+    {
+        /* BOLERO ADDED */
+        if (bgp->boleroConn)
+        {
+            PQfinish(bgp->boleroConn);
+            zlog_debug("Bolero connection closed.\n");
         }
         zlog_notice("Bolero connected!\n");
     }

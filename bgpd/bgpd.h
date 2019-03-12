@@ -49,6 +49,7 @@ struct bgp_master
     char *boleroPassword;
     char *boleroDatabase;
     char *boleroConnInfo;
+    char *routerID;
 
     /* BGP instance list.  */
     struct list *bgp;
