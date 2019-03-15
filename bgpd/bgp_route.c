@@ -2073,43 +2073,55 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
 
     /* BOLERO ADDED */
     /* send every route to bolero */
-    /* check connection */
-    if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
+    if ((peer->as) && (peer->as != peer->local_as))
     {
-        zlog(peer->log, LOG_WARNING, "Bolero connection is broken: %s\n", PQerrorMessage(bgp->boleroConn));
-        PQfinish(bgp->boleroConn);
-        zlog(peer->log, LOG_INFO, "Reconnect to Bolero\n");
-        bgp->boleroConn = PQconnectdb(bm->boleroConnInfo);
+        //Each router only has a single iBGP session with Bolero, if a route is received from eBGP, pass it to Bolero
         if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
         {
-            zlog_err("Reconnection to Bolero failed: %s\n", PQerrorMessage(bgp->boleroConn));
+            zlog(peer->log, LOG_WARNING, "Bolero connection is broken: %s\n", PQerrorMessage(bgp->boleroConn));
+            PQfinish(bgp->boleroConn);
+            zlog(peer->log, LOG_INFO, "Reconnect to Bolero\n");
+            bgp->boleroConn = PQconnectdb(bm->boleroConnInfo);
+            if (PQstatus(bgp->boleroConn) != CONNECTION_OK)
+            {
+                zlog_err("Reconnection to Bolero failed: %s\n", PQerrorMessage(bgp->boleroConn));
+            }
         }
-    }
-    if (PQstatus(bgp->boleroConn) == CONNECTION_OK)
-    {
-        sqlBuf = malloc(1024);
-        // fixme: use prepare statement
-        //snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop.s_addr), attr->aspath->str);
-        snprintf(sqlBuf, 1024, "INSERT INTO rib (prefix, local_preference, metric, next_hop, as_path, router) VALUES('%s/%d', %d, %d, '%s', '%s', '%s') RETURNING rid", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, bm->routerID);
-        bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
-        if (PQresultStatus(bgp->boleroRes) != PGRES_TUPLES_OK)
+        if (PQstatus(bgp->boleroConn) == CONNECTION_OK)
         {
-            zlog(peer->log, LOG_ERR, "Failed to report new route for prefix %s/%d to Bolero: %s\n", inet_ntoa(p->u.prefix4), p->prefixlen, PQerrorMessage(bgp->boleroConn));
-        }
-        else if (PQntuples(bgp->boleroRes) != 1)
-        {
-            /* this case should no happen */
-            zlog(peer->log, LOG_ERR, "Bolero didn't return valid value as route id for prefix %s/%d.\n", inet_ntoa(p->u.prefix4), p->prefixlen);
-        }
-        else
-        {
-            attr->rid = atol(PQgetvalue(bgp->boleroRes, 0, 0));
-            zlog(peer->log, LOG_DEBUG, "prefix %s/%d reported to Bolero and get route id %ld\n", inet_ntoa(p->u.prefix4), p->prefixlen, attr->rid);
-        }
-        free(sqlBuf);
-        PQclear(bgp->boleroRes);
-    }
+            sqlBuf = malloc(1024);
+            // fixme: use prepare statement
+            //snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop.s_addr), attr->aspath->str);
+            snprintf(sqlBuf, 1024, "INSERT INTO rib_in (prefix, local_preference, metric, next_hop, as_path, local_router, remote_router) VALUES('%s/%d', %d, %d, '%s', '{%s}', '%s')", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, inet_ntoa(peer->local_id), inet_ntoa(peer->remote_id));
 
+            //replace white space with comma in the as path array
+            for (char *i = sqlBuf; *i != '\0'; ++i)
+            {
+                if (*i == '{')
+                {
+                    for (char *j = i; *j != '}'; ++j)
+                    {
+                        if (*j == ' ')
+                            *j = ',';
+                    }
+                }
+            }
+
+            bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
+            if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
+            {
+                zlog(peer->log, LOG_ERR, "Failed to report new route for prefix %s/%d to Bolero: %s\n", inet_ntoa(p->u.prefix4), p->prefixlen, PQerrorMessage(bgp->boleroConn));
+            }
+            else
+            {
+                attr->rid = atol(PQgetvalue(bgp->boleroRes, 0, 0));
+                zlog(peer->log, LOG_DEBUG, "prefix %s/%d reported to Bolero\n", inet_ntoa(p->u.prefix4), p->prefixlen);
+            }
+            free(sqlBuf);
+            PQclear(bgp->boleroRes);
+        }
+        return 0;
+    }
     /* When peer's soft reconfiguration enabled.  Record input packet in
      Adj-RIBs-In.  */
     if (!soft_reconfig && CHECK_FLAG(peer->af_flags[afi][safi], PEER_FLAG_SOFT_RECONFIG) && peer != bgp->peer_self)
@@ -2454,6 +2466,27 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
 
     bgp = peer->bgp;
 
+    /* BOLERO ADDED */
+    /* withdraw route from Bolero */
+    if ((peer->as) && (peer->as != peer->local_as))
+    {
+        //Each router only has a single iBGP session with Bolero, if a route withdrawl received from eBGP, pass it to Bolero
+        sqlBuf = malloc(1024);
+        snprintf(sqlBuf, 1024, "DELETE FROM rib_in WHERE prefix = '%s' AND local_router = '%s' and remote_router = '%s'", inet_ntoa(peer->local_id), inet_ntoa(peer->remote_id));
+        bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
+        if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
+        {
+            zlog(peer->log, LOG_ERR, "Failed to withdraw route for prefix %s/%d from Bolero with SQL sentence: %s. %s\n", inet_ntoa(p->u.prefix4), p->prefixlen, sqlBuf, PQerrorMessage(bgp->boleroConn));
+        }
+        else
+        {
+            zlog(peer->log, LOG_WARNING, "prefix %s/%d withrew from Bolero, %s row(s) deleted.\n", inet_ntoa(p->u.prefix4), p->prefixlen, PQcmdTuples(bgp->boleroRes));
+        }
+        free(sqlBuf);
+        PQclear(bgp->boleroRes);
+        return 0;
+    }
+
     /* Lookup node. */
     rn = bgp_afi_node_get(bgp->rib[afi][safi], afi, safi, p, prd);
 
@@ -2498,22 +2531,6 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
     if (ri && !CHECK_FLAG(ri->flags, BGP_INFO_HISTORY))
     {
         bgp_rib_withdraw(rn, ri, peer, afi, safi, prd);
-
-        /* BOLERO ADDED */
-        /* withdraw route from Bolero */
-        sqlBuf = malloc(1024);
-        snprintf(sqlBuf, 1024, "DELETE FROM rib WHERE rid = %ld", ri->attr->rid);
-        bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
-        if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
-        {
-            zlog(peer->log, LOG_ERR, "Failed to withdraw route for prefix %s/%d from Bolero with rid %ld: %s\n", inet_ntoa(p->u.prefix4), p->prefixlen, ri->attr->rid, PQerrorMessage(bgp->boleroConn));
-        }
-        else
-        {
-            zlog(peer->log, LOG_WARNING, "prefix %s/%d with rid %ld withrew from Bolero, %s row(s) deleted.\n", inet_ntoa(p->u.prefix4), p->prefixlen, ri->attr->rid, PQcmdTuples(bgp->boleroRes));
-        }
-        free(sqlBuf);
-        PQclear(bgp->boleroRes);
     }
     else if (BGP_DEBUG(update, UPDATE_IN))
         zlog(peer->log, LOG_DEBUG,
