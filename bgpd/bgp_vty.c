@@ -302,6 +302,9 @@ DEFUN(bolero,
       NO_STR
       "Enable bolero\n")
 {
+    PGconn *boleroConn;
+    PGresult *boleroRes;
+    char *sqlBuf;
     if (!bm->boleroAddress)
         bm->boleroAddress = strdup(BOLERO_DEFAULT_ADDRESS);
     if (bm->boleroPort == 0)
@@ -312,16 +315,37 @@ DEFUN(bolero,
         bm->boleroPassword = strdup(BOLERO_DEFAULT_PASSWORD);
     if (!bm->boleroDatabase)
         bm->boleroDatabase = strdup(BOLERO_DEFAULT_DATABASE);
-    //if (bgp->boleroConn)
-    //    PQfinish(bgp->boleroConn);
+
     bm->boleroConnInfo = malloc(1024);
     if (snprintf(bm->boleroConnInfo, 1024, "hostaddr=%s port=%d user=%s password=%s dbname=%s", bm->boleroAddress, bm->boleroPort, bm->boleroUser, bm->boleroPassword, bm->boleroDatabase) < 0)
     {
         vty_out(vty, "Bolero connection string is over 1024 characters.");
         return CMD_ERR_NOTHING_TODO;
     }
-    vty_out(vty, "Bolero connection string %s\n", bm->boleroConnInfo);
-    return CMD_SUCCESS;
+    boleroConn = PQconnectdb(bm->boleroConnInfo);
+    if (PQstatus(boleroConn) != CONNECTION_OK)
+    {
+        vty_out(vty, "Bolero initialization failed: %s\n", PQerrorMessage(boleroConn));
+        PQfinish(boleroConn);
+        return CMD_ERR_NOTHING_TODO;
+    }
+    sqlBuf = malloc(1024);
+    snprintf(sqlBuf, 1024, "INSERT INTO routers VALUES('%s', '%s', '8801') ON CONFLICT(id) DO UPDATE SET api_address = EXCLUDED.api_address, api_port = EXCLUDED.api_port;", bm->routerID, bm->boleroAddress);
+    boleroRes = PQexec(boleroConn, sqlBuf);
+    if (PQresultStatus(boleroRes) != PGRES_COMMAND_OK)
+    {
+        vty_out(vty, "Failed to register with Bolero with SQL sentence: %s. %s\n", sqlBuf, PQerrorMessage(boleroConn));
+        PQfinish(boleroConn);
+        return CMD_ERR_NOTHING_TODO;
+    }
+    else
+    {
+        free(sqlBuf);
+        PQclear(boleroRes);
+        vty_out(vty, "Registered with Bolero.");
+        PQfinish(boleroConn);
+        return CMD_ERR_NOTHING_TODO;
+    }
 }
 
 /* BOLERO ADDED */

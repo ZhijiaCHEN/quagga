@@ -2091,8 +2091,7 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
         {
             sqlBuf = malloc(1024);
             // fixme: use prepare statement
-            //snprintf(sqlBuf, 1024, "INSERT INTO rib VALUES(%d, %d, %d, %d, %d, '%s')", ntohl(p->u.prefix4.s_addr), p->prefixlen, attr->local_pref, attr->med, ntohl(attr->nexthop.s_addr), attr->aspath->str);
-            snprintf(sqlBuf, 1024, "INSERT INTO rib_in (prefix, local_preference, metric, next_hop, as_path, local_router, remote_router) VALUES('%s/%d', %d, %d, '%s', '{%s}', '%s')", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, inet_ntoa(peer->local_id), inet_ntoa(peer->remote_id));
+            snprintf(sqlBuf, 1024, "INSERT INTO rib_in (rid, prefix, local_preference, metric, next_hop, as_path, local_router, remote_router) VALUES(default, '%s/%d', %d, %d, '%s', '{%s}', '%s', '%s')", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, bm->routerID, peer->host);
 
             //replace white space with comma in the as path array
             for (char *i = sqlBuf; *i != '\0'; ++i)
@@ -2114,7 +2113,6 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
             }
             else
             {
-                attr->rid = atol(PQgetvalue(bgp->boleroRes, 0, 0));
                 zlog(peer->log, LOG_DEBUG, "prefix %s/%d reported to Bolero\n", inet_ntoa(p->u.prefix4), p->prefixlen);
             }
             free(sqlBuf);
@@ -2203,7 +2201,8 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
     attr_new = bgp_attr_intern(&new_attr);
 
     /* If the update is implicit withdraw. */
-    if (ri)
+    //if (ri)
+    if (false)
     {
         ri->uptime = bgp_clock();
 
@@ -2472,7 +2471,7 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
     {
         //Each router only has a single iBGP session with Bolero, if a route withdrawl received from eBGP, pass it to Bolero
         sqlBuf = malloc(1024);
-        snprintf(sqlBuf, 1024, "DELETE FROM rib_in WHERE prefix = '%s' AND local_router = '%s' and remote_router = '%s'", inet_ntoa(peer->local_id), inet_ntoa(peer->remote_id));
+        snprintf(sqlBuf, 1024, "DELETE FROM rib_in WHERE prefix = '%s/%d' AND local_router = '%s' AND remote_router = '%s'", inet_ntoa(p->u.prefix4), p->prefixlen, bm->routerID, peer->host);
         bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
         if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
         {
@@ -2480,7 +2479,7 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
         }
         else
         {
-            zlog(peer->log, LOG_WARNING, "prefix %s/%d withrew from Bolero, %s row(s) deleted.\n", inet_ntoa(p->u.prefix4), p->prefixlen, PQcmdTuples(bgp->boleroRes));
+            zlog(peer->log, LOG_WARNING, "prefix %s/%d withrew from Bolero with: %s\n %s row(s) deleted.\n", inet_ntoa(p->u.prefix4), p->prefixlen, sqlBuf, PQcmdTuples(bgp->boleroRes));
         }
         free(sqlBuf);
         PQclear(bgp->boleroRes);
