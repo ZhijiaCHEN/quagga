@@ -2127,8 +2127,15 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
 
     /* Check previously received route. */
     for (ri = rn->info; ri; ri = ri->next)
-        if (ri->peer == peer && ri->type == type && ri->sub_type == sub_type)
+    //if (ri->peer == peer && ri->type == type && ri->sub_type == sub_type)
+    /* BOLERO ADDED */
+    //since all routes are distributed by Bolero, we also need to match nexthop (actually, the remote router) to know if two routes are from the same source
+    {
+        if (ri->peer == peer && ri->type == type && ri->sub_type == sub_type && ri->attr->nexthop.s_addr == attr->nexthop.s_addr)
+        {
             break;
+        }
+    }
 
     /* AS path local-as loop check. */
     if (peer->change_local_as)
@@ -2434,6 +2441,17 @@ int bgp_update(struct peer *peer, struct prefix *p, struct attr *attr,
     struct bgp *bgp;
     int ret;
 
+    /* BOLERO ADDED */
+    //Since all the routes are received from Bolero, a router is not able to differenciate between different routes to the same prefix (which is only matched by prefix and peer address). Bolero pass necessary infomation in attributes, making the withdraw message looks like a new route update message.
+    zlog(peer->log, LOG_DEBUG, "bgp update is going to check community\n");
+    if (attr->community)
+    {
+        if (community_include(attr->community, COMMUNITY_BOLERO_WITHDRAW))
+        {
+            return bgp_withdraw(peer, p, attr, afi, safi, type, sub_type, prd, tag);
+        }
+    }
+
     ret = bgp_update_main(peer, p, attr, afi, safi, type, sub_type, prd, tag,
                           soft_reconfig);
 
@@ -2464,11 +2482,11 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
     char *sqlBuf;
 
     bgp = peer->bgp;
-
     /* BOLERO ADDED */
     /* withdraw route from Bolero */
     if ((peer->as) && (peer->as != peer->local_as))
     {
+        zlog(peer->log, LOG_DEBUG, "send withdraw to bolero\n");
         //Each router only has a single iBGP session with Bolero, if a route withdrawl received from eBGP, pass it to Bolero
         sqlBuf = malloc(1024);
         snprintf(sqlBuf, 1024, "DELETE FROM rib_in WHERE prefix = '%s/%d' AND local_router = '%s' AND remote_router = '%s'", inet_ntoa(p->u.prefix4), p->prefixlen, bm->routerID, peer->host);
@@ -2523,8 +2541,15 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
 
     /* Lookup withdrawn route. */
     for (ri = rn->info; ri; ri = ri->next)
-        if (ri->peer == peer && ri->type == type && ri->sub_type == sub_type)
+    {
+        /* BOLERO MODIFIED */
+        //A withdrawn route should also match next hop to distinguiate it from other routes sent by Bolero
+        //if (ri->peer == peer && ri->type == type && ri->sub_type == sub_type)
+        if (ri->peer == peer && ri->type == type && ri->sub_type == sub_type && ri->attr->nexthop.s_addr == attr->nexthop.s_addr)
+        {
             break;
+        }
+    }
 
     /* Withdraw specified route from routing table. */
     if (ri && !CHECK_FLAG(ri->flags, BGP_INFO_HISTORY))
