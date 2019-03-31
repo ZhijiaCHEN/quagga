@@ -2091,7 +2091,7 @@ bgp_update_main(struct peer *peer, struct prefix *p, struct attr *attr,
         {
             sqlBuf = malloc(1024);
             // fixme: use prepare statement
-            snprintf(sqlBuf, 1024, "INSERT INTO rib_in (rid, prefix, local_preference, metric, next_hop, as_path, local_router, remote_router) VALUES(default, '%s/%d', %d, %d, '%s', '{%s}', '%s', '%s')", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, bm->routerID, peer->host);
+            snprintf(sqlBuf, 1024, "INSERT INTO rib_in (rid, prefix, local_preference, metric, next_hop, as_path, source_router, remote_router) VALUES(default, '%s/%d', %d, %d, '%s', '{%s}', '%s', '%s')", inet_ntop(p->family, &p->u.prefix, addrBuf, BUFSIZ), p->prefixlen, attr->local_pref, attr->med, inet_ntoa(attr->nexthop), attr->aspath->str, bm->routerID, peer->host);
 
             //replace white space with comma in the as path array
             for (char *i = sqlBuf; *i != '\0'; ++i)
@@ -2443,7 +2443,6 @@ int bgp_update(struct peer *peer, struct prefix *p, struct attr *attr,
 
     /* BOLERO ADDED */
     //Since all the routes are received from Bolero, a router is not able to differenciate between different routes to the same prefix (which is only matched by prefix and peer address). Bolero pass necessary infomation in attributes, making the withdraw message looks like a new route update message.
-    zlog(peer->log, LOG_DEBUG, "bgp update is going to check community\n");
     if (attr->community)
     {
         if (community_include(attr->community, COMMUNITY_BOLERO_WITHDRAW))
@@ -2489,7 +2488,7 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, struct attr *attr,
         zlog(peer->log, LOG_DEBUG, "send withdraw to bolero\n");
         //Each router only has a single iBGP session with Bolero, if a route withdrawl received from eBGP, pass it to Bolero
         sqlBuf = malloc(1024);
-        snprintf(sqlBuf, 1024, "DELETE FROM rib_in WHERE prefix = '%s/%d' AND local_router = '%s' AND remote_router = '%s'", inet_ntoa(p->u.prefix4), p->prefixlen, bm->routerID, peer->host);
+        snprintf(sqlBuf, 1024, "DELETE FROM rib_in WHERE prefix = '%s/%d' AND source_router = '%s' AND remote_router = '%s'", inet_ntoa(p->u.prefix4), p->prefixlen, bm->routerID, peer->host);
         bgp->boleroRes = PQexec(bgp->boleroConn, sqlBuf);
         if (PQresultStatus(bgp->boleroRes) != PGRES_COMMAND_OK)
         {
